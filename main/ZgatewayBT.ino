@@ -505,6 +505,7 @@ void updateDevicesStatus() {
                                     p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::TILEN ||
                                     p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::ITAG ||
                                     p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM2 ||
+                                    p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM6 ||
                                     p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::RUUVITAG_RAWV1 ||
                                     p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::RUUVITAG_RAWV2)) { // We apply the offline status only for tracking device, can be extended further to all the devices
       if ((p->lastUpdate != 0) && (p->lastUpdate < (now - BTConfig.presenceAwayTimer) && (now > BTConfig.presenceAwayTimer)) &&
@@ -583,6 +584,18 @@ void BM2Discovery(const char* mac, const char* sensorModel_id) {
   createDiscoveryFromList(mac, BM2sensor, BM2parametersCount, "BM2", "Generic", sensorModel_id);
 }
 
+void BM6Discovery(const char* mac, const char* sensorModel_id) {
+#    define BM6parametersCount 2
+  Log.trace(F("BM6Discovery" CR));
+  const char* BM6sensor[BM6parametersCount][9] = {
+      {"sensor", "volt", mac, "voltage", jsonVoltBM6, "", "", "V", stateClassMeasurement}, // We use a json definition that retrieve only data from the BM6 decoder, as this sensor also advertize volt as an iBeacon
+      {"sensor", "batt", mac, "battery", jsonBatt, "", "", "%", stateClassMeasurement}
+      //component type,name,availability topic,device class,value template,payload on, payload off, unit of measurement
+  };
+
+  createDiscoveryFromList(mac, BM6sensor, BM6parametersCount, "BM6", "Generic", sensorModel_id);
+}
+
 void LYWSD03MMCDiscovery(const char* mac, const char* sensorModel) {
 #    define LYWSD03MMCparametersCount 4
   Log.trace(F("LYWSD03MMCDiscovery" CR));
@@ -646,6 +659,7 @@ void MHO_C401Discovery(const char* mac, const char* sensorModel) {}
 void HHCCJCY01HHCCDiscovery(const char* mac, const char* sensorModel) {}
 void DT24Discovery(const char* mac, const char* sensorModel_id) {}
 void BM2Discovery(const char* mac, const char* sensorModel_id) {}
+void BM6Discovery(const char* mac, const char* sensorModel_id) {}
 void XMWSDJ04MMCDiscovery(const char* mac, const char* sensorModel_id) {}
 #  endif
 
@@ -804,6 +818,10 @@ void BLEconnect() {
             BM2_connect BLEclient(addr);
             BLEclient.processActions(BLEactions);
             BLEclient.publishData();
+          } else if (p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM6) {
+            BM6_connect BLEclient(addr);
+            BLEclient.processActions(BLEactions);
+            BLEclient.publishData();
           } else if (p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC) {
             HHCCJCY01HHCC_connect BLEclient(addr);
             BLEclient.processActions(BLEactions);
@@ -833,6 +851,7 @@ void BLEconnect() {
                     p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC &&
                     p->sensorModel_id != BLEconectable::id::LYWSD03MMC &&
                     p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::BM2 &&
+                    p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::BM6 &&
                     p->sensorModel_id != BLEconectable::id::MHO_C401 &&
                     p->sensorModel_id != BLEconectable::id::XMWSDJ04MMC) {
                   // if irregulary connected to and connection failed clear the connect flag.
@@ -1060,7 +1079,7 @@ void launchBTDiscovery(bool overrideDiscovery) {
         if (!BTConfig.extDecoderEnable && // Do not decode if an external decoder is configured
             p->sensorModel_id > TheengsDecoder::BLE_ID_NUM::UNKNOWN_MODEL &&
             p->sensorModel_id < TheengsDecoder::BLE_ID_NUM::BLE_ID_MAX &&
-            p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC && p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::BM2) { // Exception on HHCCJCY01HHCC and BM2 as these ones are discoverable and connectable
+            p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC && p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::BM2 && p->sensorModel_id != TheengsDecoder::BLE_ID_NUM::BM6) { // Exception on HHCCJCY01HHCC and BM2 as these ones are discoverable and connectable
           if (p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::NUT ||
               p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::MIBAND ||
               p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::TAGIT ||
@@ -1142,7 +1161,7 @@ void launchBTDiscovery(bool overrideDiscovery) {
         } else {
           if (p->sensorModel_id > BLEconectable::id::MIN &&
                   p->sensorModel_id < BLEconectable::id::MAX ||
-              p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC || p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM2) {
+              p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC || p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM2 || p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM6) {
             // Discovery of sensors from which we retrieve data only by connect
             if (p->sensorModel_id == BLEconectable::id::DT24_BLE) {
               DT24Discovery(macWOdots.c_str(), "DT24-BLE");
@@ -1154,6 +1173,19 @@ void launchBTDiscovery(bool overrideDiscovery) {
               String tracker_id = macWOdots + "-tracker";
               createDiscovery("device_tracker",
                               discovery_topic.c_str(), "BM2-tracker", tracker_id.c_str(),
+                              will_Topic, "occupancy", "{% if value_json.get('rssi') -%}home{%- else -%}not_home{%- endif %}",
+                              "", "", "",
+                              0, "", "", false, "",
+                              model.c_str(), brand.c_str(), model_id.c_str(), macWOdots.c_str(), false,
+                              stateClassNone);
+            }
+            if (p->sensorModel_id == TheengsDecoder::BLE_ID_NUM::BM6) {
+              // Sensor discovery
+              BM6Discovery(macWOdots.c_str(), "BM6");
+              // Device tracker discovery
+              String tracker_id = macWOdots + "-tracker";
+              createDiscovery("device_tracker",
+                              discovery_topic.c_str(), "BM6-tracker", tracker_id.c_str(),
                               will_Topic, "occupancy", "{% if value_json.get('rssi') -%}home{%- else -%}not_home{%- endif %}",
                               "", "", "",
                               0, "", "", false, "",
@@ -1229,7 +1261,7 @@ void process_bledata(JsonObject& BLEdata) {
   if ((BLEdata["type"].as<string>()).compare("RMAC") != 0 && model_id != TheengsDecoder::BLE_ID_NUM::IBEACON) { // Do not store in memory the random mac devices and iBeacons
     if (model_id >= 0) { // Broadcaster devices
       Log.trace(F("Decoder found device: %s" CR), BLEdata["model_id"].as<const char*>());
-      if (model_id == TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC || model_id == TheengsDecoder::BLE_ID_NUM::BM2) { // Device that broadcast and can be connected
+      if (model_id == TheengsDecoder::BLE_ID_NUM::HHCCJCY01HHCC || model_id == TheengsDecoder::BLE_ID_NUM::BM2 || model_id == TheengsDecoder::BLE_ID_NUM::BM6) { // Device that broadcast and can be connected
         createOrUpdateDevice(mac, device_flags_connect, model_id, mac_type);
       } else {
         createOrUpdateDevice(mac, device_flags_init, model_id, mac_type);
