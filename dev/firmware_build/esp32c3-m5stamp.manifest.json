@@ -2,7 +2,7 @@
   "name": "OpenMQTTGateway",
   "builds": [
     {
-      "chipFamily": "ESP32",
+      "chipFamily": "ESP32-C3",
       "improv": false,
       "parts": [
         { "path": "/dev/firmware_build/bootloader_dio_80m-C3.bin", "offset": 4096 },
